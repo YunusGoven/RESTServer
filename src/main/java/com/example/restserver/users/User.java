@@ -1,4 +1,5 @@
 package com.example.restserver.users;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.*;
 
 import javax.validation.constraints.NotBlank;
@@ -20,6 +21,11 @@ public class User {
     @NotBlank(message="Password must not be blank")
     @Size(min=6, max=999, message="Password will have this number of characters : min 6")
     private String password;
+
+    public User(@JsonProperty("login") String login, @JsonProperty("password") String password) {
+        this.login = login;
+        this.password = password;
+    }
 
     @Override
     public boolean equals(Object o) {
