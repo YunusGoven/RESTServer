@@ -1,5 +1,7 @@
 package com.example.acq.server;
 
+import com.example.EncryptionAes;
+
 import javax.net.ssl.*;
 import java.io.*;
 import java.net.InetAddress;
@@ -12,13 +14,19 @@ public class ACSComunicator {
     private InetAddress ip;
     private BufferedReader in;
     private PrintWriter out;
+    private final EncryptionAes encryptionAes;
 
     public ACSComunicator (InetAddress ip, int port) {
         this.ip = ip;
         this.port = port;
+        this.encryptionAes = new EncryptionAes();
     }
 
+    /**
+     * Init SSL configuration between ACS and ACQ
+     */
     public void init () {
+        //TODO certificat
         try {
             KeyStore keystore = KeyStore.getInstance("PKCS12");
             keystore.load(new FileInputStream(getClass().getResource("/yunand.p12").getPath()), "dalgov".toCharArray());
@@ -41,17 +49,25 @@ public class ACSComunicator {
         }
     }
 
+    /**
+     * Crypt message in AES and send to ACS
+     * @param message it's the code
+     */
     public void sendMessage(String message) {
-        //todo chiffrer message
-        out.println(message);
+        String encryptMessage = encryptionAes.encrypt(message);
+        out.println(encryptMessage);
         out.flush();
         System.out.println("Message (" +message+ ") is successfully send to ["+ sslSocket.getInetAddress().getHostAddress()+":"+port+ "]");
     }
 
+    /**
+     * Read crypted message from ACS and return a decrypted message
+     * @return decrypted message
+     */
     public String readLine() {
         try {
             String receipt = in.readLine();
-            //todo dechiffrer message
+            receipt = encryptionAes.decrypt(receipt);
             System.out.println("Receive (" + receipt + ") from "+"[SERVER "+ sslSocket.getInetAddress().getHostAddress() + ":" + port+ "]" );
             return receipt;
         }catch(Exception e) {
@@ -60,6 +76,9 @@ public class ACSComunicator {
         return "exit";
     }
 
+    /**
+     * Close the connection with ACS
+     */
     public void close() {
         try {
             sslSocket.close();

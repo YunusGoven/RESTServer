@@ -1,16 +1,23 @@
 package com.example.acs.server;
 
+import com.example.EncryptionAes;
+
 import java.io.*;
 import java.net.Socket;
 import java.nio.charset.Charset;
 
+/**
+ * Classe qui permet d'effectuer les communications avec les autres serveurs
+ */
 public class ServerCommunication {
     private Socket client;
-    private String servername;
+    private ServerName servername;
     private BufferedReader in;
     private PrintWriter out;
+    private final EncryptionAes encryptionAes;
 
-    public ServerCommunication(Socket client, String servername) {
+    public ServerCommunication(Socket client, ServerName servername) {
+        this.encryptionAes = new EncryptionAes();
         this.client = client;
         this.servername = servername;
         try {
@@ -21,11 +28,15 @@ public class ServerCommunication {
         }
     }
 
+    /**
+     * Read crypted message from ACS and return a decrypted message
+     * @return decrypted message
+     */
     public String readLine() {
         try {
             String line;
             if ((line = in.readLine())!= null) {
-                //todo dechiffrer message
+                line = encryptionAes.decrypt(line);
                 System.out.println("["+servername+"]"+" Receive from "+"[Client "+ client.getInetAddress().getHostAddress()+"] : "+ line );
                 return line;
             }
@@ -35,11 +46,13 @@ public class ServerCommunication {
         return  "exit";
     }
 
-
-
+    /**
+     * Crypt message in AES and send to ACS
+     * @param message it's the code
+     */
     public void sendMessage(String message) {
-        //todo chiffrer messager
-        out.println(message);
+        String encryptMessage = encryptionAes.encrypt(message);
+        out.println(encryptMessage);
         out.flush();
         System.out.println("["+servername+"]"+" Send to "+"[Client "+ client.getInetAddress().getHostAddress()+"] : "+ message );
     }

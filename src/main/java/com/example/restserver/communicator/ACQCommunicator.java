@@ -1,5 +1,7 @@
 package com.example.restserver.communicator;
 
+import com.example.EncryptionAes;
+
 import javax.net.ssl.*;
 import java.io.*;
 import java.net.InetAddress;
@@ -12,14 +14,20 @@ public class ACQCommunicator {
     private InetAddress ip;
     private BufferedReader in;
     private PrintWriter out;
+    private final EncryptionAes encryptionAes;
 
     public ACQCommunicator (InetAddress ip, int port) {
         this.ip = ip;
         this.port = port;
+        this.encryptionAes = new EncryptionAes();
     }
 
+    /**
+     * Init SSL configuration between https API and ACQ
+     */
     public void init () {
         try {
+            //TODO certificat
             KeyStore keystore = KeyStore.getInstance("PKCS12");
             keystore.load(new FileInputStream(getClass().getResource("/yunand.p12").getPath()), "dalgov".toCharArray());
             KeyManagerFactory kf = KeyManagerFactory.getInstance("SUNX509");
@@ -41,17 +49,25 @@ public class ACQCommunicator {
         }
     }
 
+    /**
+     * Crypt message in AES and send to ACS
+     * @param message it's the code
+     */
     public void sendMessage(String message) {
-        //todo chiffrer message
-        out.println(message);
+        String encryptMessage = encryptionAes.encrypt(message);
+        out.println(encryptMessage);
         out.flush();
         System.out.println("Message (" +message+ ") is successfully send to ["+ sslSocket.getInetAddress().getHostAddress()+":"+port+ "]");
     }
 
+    /**
+     * Read crypted message from ACS and return a decrypted message
+     * @return decrypted message
+     */
     public String readLine() {
         try {
             String receipt = in.readLine();
-            //todo dechiffrer message
+            receipt = encryptionAes.decrypt(receipt);
             System.out.println("Receive (" + receipt + ") from "+"[SERVER "+ sslSocket.getInetAddress().getHostAddress() + ":" + port+ "]" );
             return receipt;
         }catch(Exception e) {
@@ -60,6 +76,9 @@ public class ACQCommunicator {
         return "exit";
     }
 
+    /**
+     * Close connection between https API and ACQ
+     */
     public void close() {
         try {
             sslSocket.close();
