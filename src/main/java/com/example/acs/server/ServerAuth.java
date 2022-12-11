@@ -5,13 +5,14 @@ import java.io.FileInputStream;
 import java.net.InetAddress;
 import java.security.KeyStore;
 import java.util.Map;
+import java.util.Set;
 
 public class ServerAuth implements Runnable {
     private SSLServerSocket sslServerSocket;
     private final int PORT_AUTH = 2555;
-    private final Map<UserCardInfo, String> savedCode;
+    private final Set<SavedCode> savedCode;
 
-    public ServerAuth(Map<UserCardInfo, String> savedCode){
+    public ServerAuth(Set<SavedCode> savedCode){
         this.savedCode = savedCode;
     }
 

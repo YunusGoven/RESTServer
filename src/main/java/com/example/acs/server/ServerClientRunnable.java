@@ -11,9 +11,8 @@ import java.security.*;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
-import java.util.Base64;
-import java.util.Map;
-import java.util.UUID;
+import java.time.Instant;
+import java.util.*;
 
 /**
  * Thread for each new client will connect to ACS and do exchange
@@ -25,9 +24,9 @@ public class ServerClientRunnable implements Runnable{
     private boolean stop =false;
     private ServerCommunication serverCommunication;
     private CardList cardList = new CardList();
-    private Map<UserCardInfo, String> savedCode;
+    private Set<SavedCode> savedCode;
 
-    public ServerClientRunnable(Socket client, ServerName servername, Map<UserCardInfo, String> savedCode) {
+    public ServerClientRunnable(Socket client, ServerName servername, Set<SavedCode> savedCode) {
         this.client = client;
         this.servername = servername;
         this.serverCommunication = new ServerCommunication(this.client, servername);
@@ -44,10 +43,10 @@ public class ServerClientRunnable implements Runnable{
                     case ACS_SERVER_MONEY:
                         // verify code is valid
                         boolean valid = verifyCode(received);
+                        if (valid)
+                            savedCode.removeIf(e -> e.getCode().equals(received));
                         // send ACK ou NACK to ACQ according to the code
                         serverCommunication.sendMessage(valid ? "ACK" : "NACK");
-                        if (valid)
-                            savedCode.entrySet().removeIf(entry -> entry.getValue().equals(received));
                         break;
                     case ACS_SERVER_AUTH:
                         //read signature and verify if it's valid
@@ -140,7 +139,14 @@ public class ServerClientRunnable implements Runnable{
      * @return true if contains else false
      */
     private boolean verifyCode(String message) {
-        return savedCode.containsValue(message);
+        Date now = new Date();
+        return savedCode.stream().anyMatch(e -> {
+            Instant t = e.getCreatedTime().toInstant();
+            Date creation = Date.from(t);
+            //TODO st time to check
+            creation.setMinutes(creation.getMinutes()+2);
+            return e.getCode().equals(message) && creation.after(now);
+        });
     }
 
     /**
@@ -155,7 +161,10 @@ public class ServerClientRunnable implements Runnable{
             boolean valid = cardList.contains(userCardInfo);
             if (valid) {
                 String code = genCode();
-                savedCode.put(userCardInfo, code);
+                if (!savedCode.add(new SavedCode(userCardInfo.getCard_number(), code, new Date()))) {
+                    savedCode.removeIf(e -> e.getCardNumber() == userCardInfo.getCard_number());
+                    savedCode.add(new SavedCode(userCardInfo.getCard_number(), code, new Date()));
+                }
                 return code;
             }
         } catch (JsonProcessingException e) {
