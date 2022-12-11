@@ -3,8 +3,15 @@ package com.example.acs.server;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.Socket;
+import java.nio.file.Files;
+import java.security.*;
+import java.security.spec.InvalidKeySpecException;
+import java.security.spec.PKCS8EncodedKeySpec;
+import java.security.spec.X509EncodedKeySpec;
+import java.util.Base64;
 import java.util.Map;
 import java.util.UUID;
 
@@ -43,12 +50,21 @@ public class ServerClientRunnable implements Runnable{
                             savedCode.entrySet().removeIf(entry -> entry.getValue().equals(received));
                         break;
                     case ACS_SERVER_AUTH:
-                        // verify card info and generate card if exist
-                        //todo verify signature
-                        String code = generateCode(received);
+                        //read signature and verify if it's valid
+                        String RSASHASignature = serverCommunication.readLineNormal();
+                        boolean RSASHASignatureCheck = checkRSASHASignature(received, RSASHASignature);
+
+                        // if signature ok verify card info and generate card if exist else send error
+                        String code = RSASHASignatureCheck ? generateCode(received) : "NOT VALID";
+
+                        //Signer le code et l'envoyer
+                        String signature = getRSASHA256Signature(code);
                         // send code to Client app
-                        //todo signer message
                         serverCommunication.sendMessage(code);
+                        if (signature != null)
+                            serverCommunication.sendMessage(signature);
+                        else
+                            serverCommunication.sendMessage("Error during doing signature");
                         break;
                     default:
                         clientExit();
@@ -57,6 +73,65 @@ public class ServerClientRunnable implements Runnable{
             // close connection between client
             clientExit();
         }
+    }
+
+    /**
+     * Verify signature is valid with the public key of client
+     * @param message   message in clair
+     * @param signatureString  signature from client
+     * @return  true if valid else false
+     */
+    private boolean checkRSASHASignature(String message, String signatureString) {
+        try {
+            byte[] signature;
+            signature = decode(signatureString);
+            byte[] messageBytes = message.getBytes();
+            File publicKeyFile = new File("src/main/resources/RSA_KEY/public_key_client.pub");
+            byte[] publicKeyBytes = Files.readAllBytes(publicKeyFile.toPath());
+            X509EncodedKeySpec keySpecPublic = new X509EncodedKeySpec(publicKeyBytes);
+            KeyFactory keyFactory = KeyFactory.getInstance("RSA");
+            PublicKey publicKey = keyFactory.generatePublic(keySpecPublic);
+            Signature s = Signature.getInstance("SHA256withRSA");
+            s.initVerify(publicKey);
+            s.update(messageBytes);
+            boolean ok = s.verify(signature);
+            System.out.println("["+this.servername+"]"+" Signature "+"[Client "+ client.getInetAddress().getHostAddress()+"] : "+ "Signature verification result: " + ok);
+            return ok;
+        } catch (Exception e) {
+            System.err.println("["+this.servername+"]"+"[Client "+ client.getInetAddress().getHostAddress()+"] : "+ "Signature verification result: " + false);
+            return false;
+        }
+    }
+
+    /**
+     * Get signature for message with ACS private key
+     * @param message message
+     * @return  Signature in String or null
+     */
+    private String getRSASHA256Signature(String message) {
+        try {
+            byte[] messageBytes = message.getBytes();
+            File privateKeyFile = new File("src/main/resources/RSA_KEY/private_key_acs.priv");
+            byte[] privateKeyBytes = Files.readAllBytes(privateKeyFile.toPath());
+            PKCS8EncodedKeySpec keySpecPrivate = new PKCS8EncodedKeySpec(privateKeyBytes);
+            KeyFactory keyFactory = KeyFactory.getInstance("RSA");
+            PrivateKey privateKey = keyFactory.generatePrivate(keySpecPrivate);
+            Signature s = Signature.getInstance("SHA256withRSA");
+            s.initSign(privateKey);
+            s.update(messageBytes);
+            byte[] signatureByte = s.sign();
+            return encode(signatureByte);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    private  String encode(byte[] data){
+        return Base64.getEncoder().encodeToString(data);
+    }
+    private  byte[] decode(String data){
+        return Base64.getDecoder().decode(data);
     }
 
     /**

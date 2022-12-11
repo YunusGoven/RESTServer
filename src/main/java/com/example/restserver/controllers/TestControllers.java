@@ -23,7 +23,6 @@ public class TestControllers {
     public ResponseEntity get2()  {
         ACQCommunicator acqCommunicator = null;
         try {
-            //TODO se baser sur ce pour faire le paiement
             acqCommunicator = new ACQCommunicator(InetAddress.getLocalHost(),1458);
             acqCommunicator.init();
             acqCommunicator.sendMessage("4148c69b-32eb-46dd-b7f3-643774dd8235");

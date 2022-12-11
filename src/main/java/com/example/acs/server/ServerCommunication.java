@@ -47,6 +47,23 @@ public class ServerCommunication {
     }
 
     /**
+     * Read message from client and return it
+     * @return message in clair
+     */
+    public String readLineNormal() {
+        try {
+            String line;
+            if ((line = in.readLine())!= null) {
+                System.out.println("["+servername+"]"+" Receive from "+"[Client "+ client.getInetAddress().getHostAddress()+"] : "+ line );
+                return line;
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return  "exit";
+    }
+
+    /**
      * Crypt message in AES and send to ACS
      * @param message it's the code
      */

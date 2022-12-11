@@ -36,7 +36,7 @@ public class HttpClientRunnable implements Runnable{
             String received = serverCommunication.readLine();
             if (!"exit".equals(received)) {
                 try {
-                    //todo change by acs ip and port
+                    //todo OPTION change by acs ip and port
                     ACSComunicator acsComunicator = new ACSComunicator(InetAddress.getLocalHost(), 5555);
                     acsComunicator.init();
                     // acq send code to acs
